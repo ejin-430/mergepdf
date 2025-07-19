@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Merger</title>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 40px;
+    }
+    #drop-zone {
+      border: 2px dashed #888;
+      border-radius: 10px;
+      padding: 30px;
+      width: 400px;
+      margin: auto;
+      background: #f9f9f9;
+      color: #333;
+    }
+    #drop-zone.hover {
+      background: #e0f7fa;
+    }
+    #file-list {
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    #merge-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #download-link {
+      display: none;
+      margin-top: 20px;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    label[for="file-input"] {
+      display: inline-block;
+      margin: 15px;
+      background: #007bff;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .spinner {
+      border: 3px solid #ccc;
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      animation: spin 1s linear infinite;
+      display: none;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+  </style>
+</head>
+<body>
+
+<h1>Merge PDF Files (Max 10)</h1>
+
+<label for="file-input">Add PDF Files</label>
+<div id="drop-zone">Or Drop PDF files here</div>
+<input type="file" id="file-input" multiple accept="application/pdf" />
+
+<div id="file-list"></div>
+<button id="merge-btn" disabled>
+  <span class="spinner" id="spinner"></span>
+  <span id="merge-text">Merge PDFs</span>
+</button>
+<a id="download-link" download="merged.pdf">Download Merged PDF</a>
+
+<script>
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  const fileListDisplay = document.getElementById("file-list");
+  const mergeBtn = document.getElementById("merge-btn");
+  const downloadLink = document.getElementById("download-link");
+  const spinner = document.getElementById("spinner");
+
+  let uploadedFiles = [];
+
+  function updateFileList() {
+    fileListDisplay.innerHTML = uploadedFiles.map(f => `📄 ${f.name}`).join("<br>");
+    mergeBtn.disabled = uploadedFiles.length < 2 || uploadedFiles.length > 10;
+  }
+
+  function handleFiles(files) {
+    const newFiles = Array.from(files).filter(f => f.type === "application/pdf");
+    if (uploadedFiles.length + newFiles.length > 10) {
+      alert("You can upload a maximum of 10 PDF files.");
+      return;
+    }
+    uploadedFiles.push(...newFiles);
+    updateFileList();
+  }
+
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("hover");
+  });
+
+  dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("hover");
+  });
+
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("hover");
+    handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener("change", e => {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  mergeBtn.addEventListener("click", async () => {
+    // Show spinner and disable button
+    spinner.style.display = "inline-block";
+    document.getElementById("merge-text").textContent = "Merging...";
+    mergeBtn.disabled = true;
+    mergeBtn.style.opacity = "0.6";
+    downloadLink.style.display = "none";
+
+    // Fake delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    try {
+      const mergedPdf = await PDFLib.PDFDocument.create();
+
+      for (const file of uploadedFiles) {
+        const bytes = await file.arrayBuffer();
+        const pdf = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+        pages.forEach(p => mergedPdf.addPage(p));
+      }
+
+      const mergedBytes = await mergedPdf.save();
+      const blob = new Blob([mergedBytes], { type: "application/pdf" });
+      downloadLink.href = URL.createObjectURL(blob);
+      downloadLink.style.display = "inline-block";
+      downloadLink.textContent = "Download Merged PDF";
+    } catch (err) {
+      console.error("PDF merge failed:", err);
+      alert("An error occurred while merging. See console for details.");
+    }
+
+    // Hide spinner and restore button
+    spinner.style.display = "none";
+    document.getElementById("merge-text").textContent = "Merge PDFs";
+    mergeBtn.disabled = false;
+    mergeBtn.style.opacity = "1";
+  });
+</script>
+</body>
+</html>
